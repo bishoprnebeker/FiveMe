@@ -1,0 +1,11 @@
+package com.example.fiveme
+
+import androidx.navigation3.runtime.NavKey
+import kotlinx.serialization.Serializable
+
+@Serializable data object Feed : NavKey
+@Serializable data class GiveFive(val parentHighFiveId: Long? = null) : NavKey
+@Serializable data object Notifications : NavKey
+@Serializable data object Profile : NavKey
+@Serializable data class ChainView(val highFiveId: Long) : NavKey
+@Serializable data object Sandbox : NavKey

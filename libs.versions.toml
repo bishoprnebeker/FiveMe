@@ -1,0 +1,331 @@
+package com.example.fiveme.ui.screens
+
+import androidx.compose.animation.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.fiveme.data.HighFive
+import com.example.fiveme.data.User
+import com.example.fiveme.ui.FiveMeViewModel
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun GiveFiveScreen(
+    parentHighFiveId: Long?,
+    viewModel: FiveMeViewModel,
+    onBack: () -> Unit
+) {
+    val currentUser by viewModel.currentUser.collectAsState()
+    val nearbyUsers by viewModel.nearbyUsers.collectAsState()
+
+    var selectedUser by remember { mutableStateOf<User?>(null) }
+    var comment by remember { mutableStateOf("") }
+    var attachPhoto by remember { mutableStateOf(false) }
+    var parentHighFiveDetails by remember { mutableStateOf<HighFive?>(null) }
+
+    // Fetch parent HighFive details if there's a parent id
+    LaunchedEffect(parentHighFiveId) {
+        if (parentHighFiveId != null) {
+            parentHighFiveDetails = viewModel.selectedHighFiveAncestry.value
+                .find { it.id == parentHighFiveId }
+                ?: viewModel.confirmedHighFives.value.find { it.id == parentHighFiveId }
+                // Fallback to query
+                ?: viewModel.selectedHighFive.value
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Give High-Five", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = Color.White
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = DeepDarkBlue,
+                    titleContentColor = Color.White
+                )
+            )
+        },
+        containerColor = DeepDarkBlue
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(16.dp)
+        ) {
+            // Inspiration Tag (If passed from "Pass It On")
+            parentHighFiveDetails?.let { parent ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp)
+                        .background(NeonGold.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+                        .border(1.dp, NeonGold.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Bolt,
+                        contentDescription = "Inspiration",
+                        tint = NeonGold,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = "Inspired by ${parent.senderName}",
+                            color = NeonGold,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "\"${parent.comment}\"",
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+
+            // Step 1: Select Recipient in Proximity
+            Text(
+                text = "1. Who is nearby? (Strangers in Vicinity)",
+                color = Color.White,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            if (nearbyUsers.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(110.dp)
+                        .background(CardSlate, RoundedCornerShape(12.dp))
+                        .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "No users in immediate vicinity!",
+                            color = NeonOrange,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Tip: Go to the Sandbox Panel (🧪 icon at top of Feed) and add simulated nearby users.",
+                            color = TextGray,
+                            fontSize = 11.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            } else {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(vertical = 4.dp)
+                ) {
+                    items(nearbyUsers) { user ->
+                        val isSelected = selectedUser?.id == user.id
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier
+                                .width(76.dp)
+                                .clickable { selectedUser = user }
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(60.dp)
+                                    .background(
+                                        if (isSelected) NeonCyan.copy(alpha = 0.2f) else CardSlate,
+                                        CircleShape
+                                    )
+                                    .border(
+                                        width = if (isSelected) 2.5.dp else 1.dp,
+                                        color = if (isSelected) NeonCyan else BorderColor,
+                                        shape = CircleShape
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(user.avatarEmoji, fontSize = 28.sp)
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = user.username.split(" ").firstOrNull() ?: user.username,
+                                color = if (isSelected) NeonCyan else Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Step 2: High-Five Message
+            Text(
+                text = "2. Add a Commemorative Message",
+                color = Color.White,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            OutlinedTextField(
+                value = comment,
+                onValueChange = { comment = it },
+                placeholder = { Text("E.g., Epic double high-five after that project demo! ✋💥") },
+                modifier = Modifier.fillMaxWidth(),
+                maxLines = 4,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    focusedContainerColor = CardSlate,
+                    unfocusedContainerColor = CardSlate,
+                    focusedBorderColor = NeonOrange,
+                    unfocusedBorderColor = BorderColor
+                ),
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Step 3: Photo Commemoration
+            Text(
+                text = "3. Commemorate with a Photo",
+                color = Color.White,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(CardSlate, RoundedCornerShape(12.dp))
+                    .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+                    .clickable { attachPhoto = !attachPhoto }
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = if (attachPhoto) Icons.Default.CameraAlt else Icons.Default.Camera,
+                    contentDescription = null,
+                    tint = if (attachPhoto) NeonCyan else TextGray,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (attachPhoto) "Photo attached!" else "Simulate high-five photo",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = if (attachPhoto) "Press to remove" else "Click to snap a picture together",
+                        color = TextGray,
+                        fontSize = 11.sp
+                    )
+                }
+                Checkbox(
+                    checked = attachPhoto,
+                    onCheckedChange = { attachPhoto = it },
+                    colors = CheckboxDefaults.colors(checkedColor = NeonCyan)
+                )
+            }
+
+            if (attachPhoto) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(100.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color.Gray.copy(alpha = 0.3f))
+                        .border(1.dp, BorderColor, RoundedCornerShape(8.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "📷 SIMULATED CAMERA PHOTO",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            // Submit Button
+            val isEnabled = selectedUser != null && comment.isNotBlank()
+            Button(
+                onClick = {
+                    val receiver = selectedUser
+                    if (receiver != null) {
+                        viewModel.sendHighFive(
+                            receiverId = receiver.id,
+                            receiverName = receiver.username,
+                            comment = comment,
+                            imagePath = if (attachPhoto) "mock_path_image" else null,
+                            parentId = parentHighFiveId
+                        )
+                        onBack()
+                    }
+                },
+                enabled = isEnabled,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = NeonOrange,
+                    disabledContainerColor = CardSlate
+                ),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+                    .border(
+                        1.dp,
+                        if (isEnabled) NeonOrange else BorderColor,
+                        RoundedCornerShape(16.dp)
+                    )
+            ) {
+                Text(
+                    text = "Initiate High-Five Request",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isEnabled) Color.White else TextGray
+                )
+            }
+        }
+    }
+}

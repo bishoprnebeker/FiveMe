@@ -1,0 +1,26 @@
+package com.example.fiveme.data
+
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+
+@Entity(tableName = "users")
+data class User(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val username: String,
+    val avatarEmoji: String, // Emojis like "✋", "⚡", "🔥", "🐱" for fun avatars
+    val isCurrentUser: Boolean = false
+)
+
+@Entity(tableName = "high_fives")
+data class HighFive(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val senderId: Long,
+    val senderName: String,
+    val receiverId: Long,
+    val receiverName: String,
+    val comment: String,
+    val imagePath: String? = null, // Local simulated image or file URI
+    val timestamp: Long = System.currentTimeMillis(),
+    val isConfirmed: Boolean = false,
+    val parentHighFiveId: Long? = null
+)

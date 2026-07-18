@@ -1,0 +1,31 @@
+package com.example.fiveme.theme
+
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
+
+private val DarkColorScheme = darkColorScheme(
+    primary = NeonOrange,
+    secondary = NeonCyan,
+    tertiary = NeonGold,
+    background = DeepDarkBlue,
+    surface = CardSlate,
+    onPrimary = Color.White,
+    onSecondary = Color.Black,
+    onBackground = Color.White,
+    onSurface = Color.White
+)
+
+@Composable
+fun FiveMeTheme(
+    darkTheme: Boolean = true, // Force dark theme for premium glowing neon experience
+    dynamicColor: Boolean = false, // Disable dynamic colors to preserve designed neon scheme
+    content: @Composable () -> Unit
+) {
+    MaterialTheme(
+        colorScheme = DarkColorScheme,
+        typography = Typography,
+        content = content
+    )
+}

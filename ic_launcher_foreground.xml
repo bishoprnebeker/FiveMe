@@ -1,0 +1,33 @@
+package com.example.fiveme
+
+import android.app.Application
+import androidx.room.Room
+import com.example.fiveme.data.AppDatabase
+import com.example.fiveme.data.DefaultDataRepository
+
+class FiveMeApplication : Application() {
+    
+    val database: AppDatabase by lazy {
+        Room.databaseBuilder(
+            applicationContext,
+            AppDatabase::class.java,
+            "fiveme_database"
+        )
+        .fallbackToDestructiveMigration()
+        .build()
+    }
+
+    val repository: DefaultDataRepository by lazy {
+        DefaultDataRepository(database.highFiveDao())
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        instance = this
+    }
+
+    companion object {
+        lateinit var instance: FiveMeApplication
+            private set
+    }
+}

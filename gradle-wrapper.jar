@@ -1,0 +1,250 @@
+package com.example.fiveme.ui.screens
+
+import androidx.compose.animation.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.fiveme.data.HighFive
+import com.example.fiveme.ui.FiveMeViewModel
+import java.text.SimpleDateFormat
+import java.util.*
+import androidx.compose.ui.graphics.Color
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun NotificationsScreen(
+    viewModel: FiveMeViewModel,
+    onBack: () -> Unit
+) {
+    val pendingList by viewModel.pendingHighFives.collectAsState()
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("High-Five Requests", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = Color.White
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = DeepDarkBlue,
+                    titleContentColor = Color.White
+                )
+            )
+        },
+        containerColor = DeepDarkBlue
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(16.dp)
+        ) {
+            Text(
+                text = "Incoming High-Fives waiting for you",
+                color = TextGray,
+                fontSize = 13.sp,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+
+            if (pendingList.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Inbox,
+                            contentDescription = null,
+                            tint = BorderColor,
+                            modifier = Modifier.size(64.dp)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "No pending requests!",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "When someone nearby gives you a high-five, you'll see a request here to confirm it.",
+                            color = TextGray,
+                            fontSize = 13.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(pendingList) { highFive ->
+                        PendingRequestCard(
+                            highFive = highFive,
+                            onAccept = { viewModel.confirmHighFive(highFive.id) },
+                            onReject = { viewModel.rejectHighFive(highFive.id) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PendingRequestCard(
+    highFive: HighFive,
+    onAccept: () -> Unit,
+    onReject: () -> Unit
+) {
+    val sdf = SimpleDateFormat("h:mm a", Locale.getDefault())
+    val dateString = sdf.format(Date(highFive.timestamp))
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, BorderColor, RoundedCornerShape(16.dp)),
+        colors = CardDefaults.cardColors(containerColor = CardSlate),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Header
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    imageVector = Icons.Default.BackHand,
+                    contentDescription = null,
+                    tint = NeonGold,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = highFive.senderName,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "sent a high-five!",
+                    color = TextGray,
+                    fontSize = 12.sp
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                Text(
+                    text = dateString,
+                    color = TextGray,
+                    fontSize = 10.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Message
+            Text(
+                text = "\"${highFive.comment}\"",
+                color = Color.White,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Normal,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(DeepDarkBlue, RoundedCornerShape(8.dp))
+                    .padding(10.dp)
+            )
+
+            // Optional parent inspiration description
+            if (highFive.parentHighFiveId != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Bolt,
+                        contentDescription = null,
+                        tint = NeonGold,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Inspired by a previous high-five chain!",
+                        color = NeonGold,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Reject
+                OutlinedButton(
+                    onClick = onReject,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Color.Red
+                    ),
+                    border = BorderStroke(1.dp, Color.Red.copy(alpha = 0.5f)),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(38.dp)
+                ) {
+                    Text("Decline", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+
+                // Accept
+                Button(
+                    onClick = onAccept,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = NeonOrange
+                    ),
+                    modifier = Modifier
+                        .weight(1.5f)
+                        .height(38.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Confirm ✋", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}

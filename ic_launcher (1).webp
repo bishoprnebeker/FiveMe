@@ -1,0 +1,68 @@
+package com.example.fiveme.data
+
+import androidx.room.*
+import kotlinx.coroutines.flow.Flow
+
+@Dao
+@JvmSuppressWildcards
+interface HighFiveDao {
+
+    // --- User Queries ---
+    @Query("SELECT * FROM users")
+    fun getAllUsersFlow(): Flow<List<User>>
+
+    @Query("SELECT * FROM users WHERE id = :id")
+    suspend fun getUserById(id: Long): User?
+
+    @Query("SELECT * FROM users WHERE username = :username LIMIT 1")
+    suspend fun getUserByName(username: String): User?
+
+    @Query("SELECT * FROM users WHERE isCurrentUser = 1 LIMIT 1")
+    fun getCurrentUserFlow(): Flow<User?>
+
+    @Query("SELECT * FROM users WHERE isCurrentUser = 1 LIMIT 1")
+    suspend fun getCurrentUser(): User?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertUser(user: User): Long
+
+    @Update
+    suspend fun updateUser(user: User): Int
+
+    @Query("UPDATE users SET isCurrentUser = 0")
+    suspend fun clearCurrentUser(): Int
+
+
+    // --- HighFive Queries ---
+    @Query("SELECT * FROM high_fives ORDER BY timestamp DESC")
+    fun getAllHighFivesFlow(): Flow<List<HighFive>>
+
+    @Query("SELECT * FROM high_fives WHERE isConfirmed = 1 ORDER BY timestamp DESC")
+    fun getConfirmedHighFivesFlow(): Flow<List<HighFive>>
+
+    @Query("SELECT * FROM high_fives WHERE senderId = :userId OR receiverId = :userId ORDER BY timestamp DESC")
+    fun getHighFivesForUserFlow(userId: Long): Flow<List<HighFive>>
+
+    @Query("SELECT * FROM high_fives WHERE receiverId = :userId AND isConfirmed = 0 ORDER BY timestamp DESC")
+    fun getPendingHighFivesForUserFlow(userId: Long): Flow<List<HighFive>>
+
+    @Query("SELECT * FROM high_fives WHERE id = :id")
+    suspend fun getHighFiveById(id: Long): HighFive?
+
+    @Query("SELECT * FROM high_fives WHERE parentHighFiveId = :parentId AND isConfirmed = 1 ORDER BY timestamp ASC")
+    suspend fun getHighFivesInspiredBy(parentId: Long): List<HighFive>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertHighFive(highFive: HighFive): Long
+
+    @Update
+    suspend fun updateHighFive(highFive: HighFive): Int
+
+    @Delete
+    suspend fun deleteHighFive(highFive: HighFive): Int
+}
+
+@Database(entities = [User::class, HighFive::class], version = 1, exportSchema = false)
+abstract class AppDatabase : RoomDatabase() {
+    abstract fun highFiveDao(): HighFiveDao
+}

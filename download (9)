@@ -1,0 +1,352 @@
+package com.example.fiveme.ui.screens
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CellTower
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.fiveme.data.User
+import com.example.fiveme.ui.FiveMeViewModel
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SandboxScreen(
+    viewModel: FiveMeViewModel,
+    onBack: () -> Unit
+) {
+    val currentUser by viewModel.currentUser.collectAsState()
+    val allUsers by viewModel.allUsers.collectAsState()
+    val simulatedNearbyIds by viewModel.simulatedNearbyIds.collectAsState()
+
+    var showInboundDialog by remember { mutableStateOf(false) }
+    var inboundSender by remember { mutableStateOf<User?>(null) }
+    var inboundComment by remember { mutableStateOf("") }
+    var inboundInspiredByChain by remember { mutableStateOf(false) }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Proximity Sandbox", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = Color.White
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = DeepDarkBlue,
+                    titleContentColor = Color.White
+                )
+            )
+        },
+        containerColor = DeepDarkBlue
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(16.dp)
+        ) {
+            // Explanation card
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+                    .border(1.dp, NeonCyan.copy(alpha = 0.3f), RoundedCornerShape(12.dp)),
+                colors = CardDefaults.cardColors(containerColor = CardSlate)
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = null,
+                        tint = NeonCyan,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = "Sandbox Controls",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                        Text(
+                            text = "Since high-fiving happens between two separate physical devices in close range, use this panel to simulate user proximity and mock inbound requests.",
+                            color = TextGray,
+                            fontSize = 11.sp,
+                            lineHeight = 16.sp
+                        )
+                    }
+                }
+            }
+
+            // Quick actions
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Vicinity Simulation (Nearby Users)",
+                    color = Color.White,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                TextButton(
+                    onClick = { viewModel.clearNearbyUsers() },
+                    colors = ButtonDefaults.textButtonColors(contentColor = Color.Red)
+                ) {
+                    Text("Clear All", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            Text(
+                text = "Toggle users to place them in/out of active vicinity range:",
+                color = TextGray,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            // Vicinity list toggle
+            LazyColumn(
+                modifier = Modifier
+                    .weight(1.3f)
+                    .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+                    .background(CardSlate, RoundedCornerShape(12.dp))
+                    .padding(4.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                // Filter out current user from being toggled as "nearby" to themselves
+                val otherUsers = allUsers.filter { it.id != currentUser?.id }
+                if (otherUsers.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "No other users registered yet. Add some in the Profile tab!",
+                                color = TextGray,
+                                fontSize = 12.sp,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                } else {
+                    items(otherUsers) { user ->
+                        val isNearby = simulatedNearbyIds.contains(user.id)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    if (isNearby) {
+                                        viewModel.removeNearbyUser(user.id)
+                                    } else {
+                                        viewModel.addNearbyUser(user.id)
+                                    }
+                                }
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(user.avatarEmoji, fontSize = 20.sp)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(user.username, color = Color.White, fontSize = 14.sp)
+                            Spacer(modifier = Modifier.weight(1f))
+                            Switch(
+                                checked = isNearby,
+                                onCheckedChange = { checked ->
+                                    if (checked) {
+                                        viewModel.addNearbyUser(user.id)
+                                    } else {
+                                        viewModel.removeNearbyUser(user.id)
+                                    }
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = NeonCyan,
+                                    checkedTrackColor = NeonCyan.copy(alpha = 0.5f)
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Trigger Inbound Request Section
+            Text(
+                text = "Mock Inbound Actions",
+                color = Color.White,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            Button(
+                onClick = {
+                    val nearbyList = allUsers.filter { simulatedNearbyIds.contains(it.id) && it.id != currentUser?.id }
+                    if (nearbyList.isNotEmpty()) {
+                        inboundSender = nearbyList.first()
+                        showInboundDialog = true
+                    }
+                },
+                enabled = allUsers.any { simulatedNearbyIds.contains(it.id) && it.id != currentUser?.id },
+                colors = ButtonDefaults.buttonColors(containerColor = NeonGold),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+            ) {
+                Icon(Icons.Default.NotificationsActive, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Mock Incoming High-Five", fontWeight = FontWeight.Bold)
+            }
+
+            Spacer(modifier = Modifier.weight(0.5f))
+        }
+
+        // Mock inbound high-five dialog
+        if (showInboundDialog) {
+            val nearbyList = allUsers.filter { simulatedNearbyIds.contains(it.id) && it.id != currentUser?.id }
+            AlertDialog(
+                onDismissRequest = { showInboundDialog = false },
+                containerColor = CardSlate,
+                title = { Text("Simulate Incoming High-Five", color = Color.White) },
+                text = {
+                    Column {
+                        Text("Select Sender (from nearby list):", color = TextGray, fontSize = 12.sp)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        
+                        // Small row list of nearby senders
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(90.dp)
+                                .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+                                .background(DeepDarkBlue, RoundedCornerShape(8.dp))
+                        ) {
+                            items(nearbyList) { sender ->
+                                val isSelected = inboundSender?.id == sender.id
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { inboundSender = sender }
+                                        .background(if (isSelected) CardSlate else Color.Transparent)
+                                        .padding(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(sender.avatarEmoji, fontSize = 16.sp)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = sender.username,
+                                        color = if (isSelected) NeonCyan else Color.White,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        fontSize = 13.sp
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        OutlinedTextField(
+                            value = inboundComment,
+                            onValueChange = { inboundComment = it },
+                            label = { Text("Sender's Comment") },
+                            placeholder = { Text("E.g., Awesome high-five matching!") },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = NeonGold,
+                                unfocusedBorderColor = BorderColor
+                            )
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Checkbox(
+                                checked = inboundInspiredByChain,
+                                onCheckedChange = { inboundInspiredByChain = it },
+                                colors = CheckboxDefaults.colors(checkedColor = NeonGold)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text("Inbound inspired by active chain", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                Text("Links to the latest confirmed high-five", color = TextGray, fontSize = 10.sp)
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    val scope = rememberCoroutineScope()
+                    val database = com.example.fiveme.FiveMeApplication.instance.database
+                    val sender = inboundSender
+                    val receiver = currentUser
+                    TextButton(
+                        onClick = {
+                            if (sender != null && receiver != null && inboundComment.isNotBlank()) {
+                                // Parent High-Five reference
+                                val parentId = if (inboundInspiredByChain) {
+                                    viewModel.confirmedHighFives.value.firstOrNull()?.id
+                                } else null
+
+                                scope.launch {
+                                    database.highFiveDao().insertHighFive(
+                                        com.example.fiveme.data.HighFive(
+                                            senderId = sender.id,
+                                            senderName = sender.username,
+                                            receiverId = receiver.id,
+                                            receiverName = receiver.username,
+                                            comment = inboundComment,
+                                            parentHighFiveId = parentId,
+                                            isConfirmed = false
+                                        )
+                                    )
+                                }
+                                inboundComment = ""
+                                showInboundDialog = false
+                            }
+                        }
+                    ) {
+                        Text(text = "Simulate", color = NeonGold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showInboundDialog = false }) {
+                        Text("Cancel", color = TextGray)
+                    }
+                }
+            )
+        }
+    }
+}

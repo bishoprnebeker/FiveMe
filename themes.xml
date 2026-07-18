@@ -1,0 +1,123 @@
+package com.example.fiveme.ui
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.fiveme.data.DataRepository
+import com.example.fiveme.data.HighFive
+import com.example.fiveme.data.User
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class FiveMeViewModel(private val repository: DataRepository) : ViewModel() {
+
+    val currentUser: StateFlow<User?> = repository.currentUser.stateIn(
+        viewModelScope, SharingStarted.WhileSubscribed(5000), null
+    )
+
+    val allUsers: StateFlow<List<User>> = repository.allUsers.stateIn(
+        viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList()
+    )
+
+    val confirmedHighFives: StateFlow<List<HighFive>> = repository.confirmedHighFives.stateIn(
+        viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList()
+    )
+
+    val nearbyUsers: StateFlow<List<User>> = repository.nearbyUsers.stateIn(
+        viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList()
+    )
+
+    val simulatedNearbyIds: StateFlow<Set<Long>> = repository.simulatedNearbyIds.stateIn(
+        viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet()
+    )
+
+    val pendingHighFives: StateFlow<List<HighFive>> = currentUser
+        .flatMapLatest { user ->
+            if (user != null) repository.getPendingHighFives(user.id)
+            else flowOf(emptyList())
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Selected high-five details for ChainView
+    private val _selectedHighFiveId = MutableStateFlow<Long?>(null)
+    
+    val selectedHighFive: StateFlow<HighFive?> = _selectedHighFiveId
+        .flatMapLatest { id ->
+            if (id != null) flow<HighFive?> { emit(repository.getHighFiveById(id)) }
+            else flowOf(null)
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val selectedHighFiveAncestry: StateFlow<List<HighFive>> = _selectedHighFiveId
+        .flatMapLatest { id ->
+            if (id != null) flow { emit(repository.getInspirationAncestry(id)) }
+            else flowOf(emptyList())
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val selectedHighFiveDescendants: StateFlow<List<HighFive>> = _selectedHighFiveId
+        .flatMapLatest { id ->
+            if (id != null) flow { emit(repository.getInspirationDescendantsTree(id)) }
+            else flowOf(emptyList())
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun selectHighFiveForChain(id: Long) {
+        _selectedHighFiveId.value = id
+    }
+
+    // --- User profile switcher ---
+    fun switchUser(userId: Long) {
+        viewModelScope.launch {
+            repository.switchUser(userId)
+        }
+    }
+
+    fun createUser(username: String, emoji: String) {
+        viewModelScope.launch {
+            repository.createUser(username, emoji)
+        }
+    }
+
+    // --- High-Five Actions ---
+    fun sendHighFive(receiverId: Long, receiverName: String, comment: String, imagePath: String?, parentId: Long?) {
+        val sender = currentUser.value ?: return
+        viewModelScope.launch {
+            repository.createHighFive(
+                senderId = sender.id,
+                senderName = sender.username,
+                receiverId = receiverId,
+                receiverName = receiverName,
+                comment = comment,
+                imagePath = imagePath,
+                parentHighFiveId = parentId
+            )
+        }
+    }
+
+    fun confirmHighFive(id: Long) {
+        viewModelScope.launch {
+            repository.confirmHighFive(id)
+        }
+    }
+
+    fun rejectHighFive(id: Long) {
+        viewModelScope.launch {
+            repository.rejectHighFive(id)
+        }
+    }
+
+    // --- Simulation tools ---
+    fun addNearbyUser(userId: Long) {
+        repository.addNearbyUser(userId)
+    }
+
+    fun removeNearbyUser(userId: Long) {
+        repository.removeNearbyUser(userId)
+    }
+
+    fun clearNearbyUsers() {
+        repository.clearNearbyUsers()
+    }
+}

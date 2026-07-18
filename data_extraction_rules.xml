@@ -1,0 +1,309 @@
+package com.example.fiveme.ui.screens
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.BackHand
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.fiveme.data.HighFive
+import com.example.fiveme.ui.FiveMeViewModel
+import java.text.SimpleDateFormat
+import java.util.*
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ChainViewScreen(
+    highFiveId: Long,
+    viewModel: FiveMeViewModel,
+    onBack: () -> Unit
+) {
+    // Select the high-five in ViewModel to fetch ancestry and descendants tree
+    LaunchedEffect(highFiveId) {
+        viewModel.selectHighFiveForChain(highFiveId)
+    }
+
+    val selectedHighFive by viewModel.selectedHighFive.collectAsState()
+    val ancestry by viewModel.selectedHighFiveAncestry.collectAsState()
+    val descendants by viewModel.selectedHighFiveDescendants.collectAsState()
+
+    // Full chain in sequence: Ancestors -> Target -> Descendants
+    // Ensure we don't duplicate target
+    val fullSequence = remember<List<ChainItem>>(selectedHighFive, ancestry, descendants) {
+        val list = mutableListOf<ChainItem>()
+        
+        // Add ancestors
+        ancestry.filter { it.id != highFiveId }.forEach {
+            list.add(ChainItem(it, isTarget = false, isAncestor = true))
+        }
+        
+        // Add target
+        selectedHighFive?.let {
+            list.add(ChainItem(it, isTarget = true, isAncestor = false))
+        }
+        
+        // Add descendants
+        descendants.forEach {
+            list.add(ChainItem(it, isTarget = false, isAncestor = false))
+        }
+        
+        list
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Inspiration Chain", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = Color.White
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = DeepDarkBlue,
+                    titleContentColor = Color.White
+                )
+            )
+        },
+        containerColor = DeepDarkBlue
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(horizontal = 16.dp)
+        ) {
+            // Stats summary card
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp)
+                    .border(1.dp, NeonGold.copy(alpha = 0.3f), RoundedCornerShape(16.dp)),
+                colors = CardDefaults.cardColors(containerColor = CardSlate)
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .background(NeonGold.copy(alpha = 0.15f), CircleShape)
+                            .border(1.dp, NeonGold, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = null,
+                            tint = NeonGold
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column {
+                        Text(
+                            text = "Chain Statistics",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp
+                        )
+                        Text(
+                            text = "Total Links: ${fullSequence.size}  |  Level in chain: ${ancestry.size}",
+                            color = TextGray,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            }
+
+            Text(
+                text = "Chain Flow Timeline",
+                color = Color.White,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+
+            if (selectedHighFive == null) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = NeonOrange)
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 32.dp)
+                ) {
+                    itemsIndexed(fullSequence) { index, item ->
+                        ChainNodeCard(
+                            item = item,
+                            isFirst = index == 0,
+                            isLast = index == fullSequence.lastIndex
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+data class ChainItem(
+    val highFive: HighFive,
+    val isTarget: Boolean,
+    val isAncestor: Boolean
+)
+
+@Composable
+fun ChainNodeCard(
+    item: ChainItem,
+    isFirst: Boolean,
+    isLast: Boolean
+) {
+    val sdf = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
+    val dateString = sdf.format(Date(item.highFive.timestamp))
+    
+    val highlightColor = if (item.isTarget) NeonOrange else if (item.isAncestor) NeonGold else NeonCyan
+    val cardBorderColor = if (item.isTarget) NeonOrange else BorderColor
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min)
+    ) {
+        // Timeline connector line
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .width(40.dp)
+                .fillMaxHeight()
+        ) {
+            // Top half line
+            Box(
+                modifier = Modifier
+                    .width(2.dp)
+                    .weight(1f)
+                    .background(if (isFirst) Color.Transparent else BorderColor)
+            )
+
+            // Central circle marker
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .background(DeepDarkBlue, CircleShape)
+                    .border(3.dp, highlightColor, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (item.isTarget) Icons.Default.BackHand else Icons.Default.Bolt,
+                    contentDescription = null,
+                    tint = highlightColor,
+                    modifier = Modifier.size(10.dp)
+                )
+            }
+
+            // Bottom half line
+            Box(
+                modifier = Modifier
+                    .width(2.dp)
+                    .weight(1f)
+                    .background(if (isLast) Color.Transparent else BorderColor)
+            )
+        }
+
+        // Card Content
+        Card(
+            modifier = Modifier
+                .padding(vertical = 6.dp)
+                .fillMaxWidth()
+                .border(
+                    width = if (item.isTarget) 1.5.dp else 1.dp,
+                    color = cardBorderColor,
+                    shape = RoundedCornerShape(12.dp)
+                ),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = CardSlate)
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = item.highFive.senderName,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        fontSize = 13.sp
+                    )
+                    Text(
+                        text = " ➔ ",
+                        color = highlightColor,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = item.highFive.receiverName,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        fontSize = 13.sp
+                    )
+                    Spacer(modifier = Modifier.weight(1f))
+                    Text(
+                        text = dateString,
+                        color = TextGray,
+                        fontSize = 10.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Text(
+                    text = "\"${item.highFive.comment}\"",
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp
+                )
+
+                if (item.isTarget) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Box(
+                        modifier = Modifier
+                            .background(NeonOrange.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                            .border(0.5.dp, NeonOrange, RoundedCornerShape(4.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "Currently Viewing",
+                            color = NeonOrange,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+    }
+}

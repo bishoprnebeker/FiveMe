@@ -1,0 +1,11 @@
+package com.example.fiveme.theme
+
+import androidx.compose.ui.graphics.Color
+
+val DeepDarkBlue = Color(0xFF0F172A)
+val CardSlate = Color(0xFF1E293B)
+val NeonOrange = Color(0xFFF97316)
+val NeonCyan = Color(0xFF06B6D4)
+val NeonGold = Color(0xFFF59E0B)
+val BorderColor = Color(0xFF334155)
+val TextGray = Color(0xFF94A3B8)

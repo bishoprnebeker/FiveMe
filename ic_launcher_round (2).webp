@@ -1,0 +1,214 @@
+package com.example.fiveme.data
+
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
+
+interface DataRepository {
+    val allUsers: Flow<List<User>>
+    val currentUser: Flow<User?>
+    val confirmedHighFives: Flow<List<HighFive>>
+    val nearbyUsers: Flow<List<User>>
+    
+    fun getPendingHighFives(userId: Long): Flow<List<HighFive>>
+    fun getHighFivesForUser(userId: Long): Flow<List<HighFive>>
+    
+    suspend fun createHighFive(
+        senderId: Long,
+        senderName: String,
+        receiverId: Long,
+        receiverName: String,
+        comment: String,
+        imagePath: String?,
+        parentHighFiveId: Long?
+    ): Long
+    
+    suspend fun confirmHighFive(highFiveId: Long)
+    suspend fun rejectHighFive(highFiveId: Long)
+    suspend fun getHighFiveById(id: Long): HighFive?
+    suspend fun getInspirationAncestry(highFiveId: Long): List<HighFive>
+    suspend fun getInspirationDescendantsTree(highFiveId: Long): List<HighFive>
+    
+    suspend fun createUser(username: String, avatarEmoji: String): Long
+    suspend fun switchUser(userId: Long)
+    
+    // Proximity Simulation Commands
+    fun addNearbyUser(userId: Long)
+    fun removeNearbyUser(userId: Long)
+    fun clearNearbyUsers()
+    val simulatedNearbyIds: StateFlow<Set<Long>>
+}
+
+class DefaultDataRepository(private val highFiveDao: HighFiveDao) : DataRepository {
+    
+    private val repositoryScope = CoroutineScope(Dispatchers.IO)
+    
+    // Proximity simulation state
+    private val _simulatedNearbyIds = MutableStateFlow<Set<Long>>(emptySet())
+    override val simulatedNearbyIds: StateFlow<Set<Long>> = _simulatedNearbyIds.asStateFlow()
+    
+    override val allUsers: Flow<List<User>> = highFiveDao.getAllUsersFlow()
+    
+    override val currentUser: Flow<User?> = highFiveDao.getCurrentUserFlow()
+    
+    override val confirmedHighFives: Flow<List<HighFive>> = highFiveDao.getConfirmedHighFivesFlow()
+    
+    override val nearbyUsers: Flow<List<User>> = combine(allUsers, currentUser, _simulatedNearbyIds) { users, current, nearbyIds ->
+        users.filter { user ->
+            user.id != current?.id && nearbyIds.contains(user.id)
+        }
+    }
+    
+    init {
+        // Pre-populate dummy users if DB is empty
+        repositoryScope.launch {
+            val users = highFiveDao.getAllUsersFlow().first()
+            if (users.isEmpty()) {
+                val user1 = createUser("Alice 🐱", "🐱")
+                val user2 = createUser("Bob ✋", "✋")
+                val user3 = createUser("Charlie ⚡", "⚡")
+                val user4 = createUser("David 🚀", "🚀")
+                val user5 = createUser("Eve 🔥", "🔥")
+                
+                // Set Alice as current user initially
+                switchUser(user1)
+                
+                // Start with Bob and Charlie nearby for demonstration
+                addNearbyUser(user2)
+                addNearbyUser(user3)
+                
+                // Create a pre-existing inspiration chain:
+                // Charlie high-fives David (comment: "Inspired by Eve's amazing presentation!")
+                // Then David high-fives Bob (comment: "Inspired by Charlie!")
+                // Let's seed this chain:
+                val h1 = highFiveDao.insertHighFive(
+                    HighFive(
+                        senderId = user5, senderName = "Eve 🔥",
+                        receiverId = user3, receiverName = "Charlie ⚡",
+                        comment = "Amazing presentation, Charlie!",
+                        isConfirmed = true,
+                        timestamp = System.currentTimeMillis() - 3600000 * 3
+                    )
+                )
+                val h2 = highFiveDao.insertHighFive(
+                    HighFive(
+                        senderId = user3, senderName = "Charlie ⚡",
+                        receiverId = user4, receiverName = "David 🚀",
+                        comment = "Thanks! Passing on the positive energy!",
+                        parentHighFiveId = h1,
+                        isConfirmed = true,
+                        timestamp = System.currentTimeMillis() - 3600000 * 2
+                    )
+                )
+                highFiveDao.insertHighFive(
+                    HighFive(
+                        senderId = user4, senderName = "David 🚀",
+                        receiverId = user2, receiverName = "Bob ✋",
+                        comment = "Awesome teamwork, Bob! Inspired by Charlie's chain!",
+                        parentHighFiveId = h2,
+                        isConfirmed = true,
+                        timestamp = System.currentTimeMillis() - 3600000
+                    )
+                )
+            }
+        }
+    }
+    
+    override fun getPendingHighFives(userId: Long): Flow<List<HighFive>> {
+        return highFiveDao.getPendingHighFivesForUserFlow(userId)
+    }
+    
+    override fun getHighFivesForUser(userId: Long): Flow<List<HighFive>> {
+        return highFiveDao.getHighFivesForUserFlow(userId)
+    }
+    
+    override suspend fun createHighFive(
+        senderId: Long,
+        senderName: String,
+        receiverId: Long,
+        receiverName: String,
+        comment: String,
+        imagePath: String?,
+        parentHighFiveId: Long?
+    ): Long {
+        val h5 = HighFive(
+            senderId = senderId,
+            senderName = senderName,
+            receiverId = receiverId,
+            receiverName = receiverName,
+            comment = comment,
+            imagePath = imagePath,
+            parentHighFiveId = parentHighFiveId,
+            isConfirmed = false // Giver initiates, needs receiver confirmation
+        )
+        return highFiveDao.insertHighFive(h5)
+    }
+    
+    override suspend fun confirmHighFive(highFiveId: Long) {
+        val h5 = highFiveDao.getHighFiveById(highFiveId)
+        if (h5 != null) {
+            highFiveDao.updateHighFive(h5.copy(isConfirmed = true))
+        }
+    }
+    
+    override suspend fun rejectHighFive(highFiveId: Long) {
+        val h5 = highFiveDao.getHighFiveById(highFiveId)
+        if (h5 != null) {
+            highFiveDao.deleteHighFive(h5)
+        }
+    }
+    
+    override suspend fun getHighFiveById(id: Long): HighFive? {
+        return highFiveDao.getHighFiveById(id)
+    }
+    
+    override suspend fun getInspirationAncestry(highFiveId: Long): List<HighFive> {
+        val chain = mutableListOf<HighFive>()
+        var currentId: Long? = highFiveId
+        while (currentId != null) {
+            val h5 = highFiveDao.getHighFiveById(currentId) ?: break
+            chain.add(h5)
+            currentId = h5.parentHighFiveId
+        }
+        return chain.reversed()
+    }
+    
+    override suspend fun getInspirationDescendantsTree(highFiveId: Long): List<HighFive> {
+        val descendants = mutableListOf<HighFive>()
+        suspend fun traverse(id: Long) {
+            val children = highFiveDao.getHighFivesInspiredBy(id)
+            descendants.addAll(children)
+            for (child in children) {
+                traverse(child.id)
+            }
+        }
+        traverse(highFiveId)
+        return descendants
+    }
+    
+    override suspend fun createUser(username: String, avatarEmoji: String): Long {
+        return highFiveDao.insertUser(User(username = username, avatarEmoji = avatarEmoji))
+    }
+    
+    override suspend fun switchUser(userId: Long) {
+        highFiveDao.clearCurrentUser()
+        val user = highFiveDao.getUserById(userId)
+        if (user != null) {
+            highFiveDao.updateUser(user.copy(isCurrentUser = true))
+        }
+    }
+    
+    // Proximity Simulation Commands
+    override fun addNearbyUser(userId: Long) {
+        _simulatedNearbyIds.update { it + userId }
+    }
+    
+    override fun removeNearbyUser(userId: Long) {
+        _simulatedNearbyIds.update { it - userId }
+    }
+    
+    override fun clearNearbyUsers() {
+        _simulatedNearbyIds.value = emptySet()
+    }
+}
